@@ -17,7 +17,7 @@ COPY start.sh /
 RUN dos2unix /start.sh && chmod +x /start.sh
 
 COPY user-setup.sh /
-RUN dos2unix /user-setup.sh && chmod +x /user-setup.h
+RUN dos2unix /user-setup.sh && chmod +x /user-setup.sh
 RUN /user-setup.sh
 
 USER runner
