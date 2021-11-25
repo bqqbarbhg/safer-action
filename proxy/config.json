@@ -1,0 +1,9 @@
+{
+    "hosts": [
+        "github.com",
+        "api.github.com",
+        "codeload.github.com",
+        "pipelines.actions.githubusercontent.com",
+        "vstoken.actions.githubusercontent.com"
+    ]
+}
