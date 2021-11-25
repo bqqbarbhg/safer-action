@@ -10,14 +10,14 @@ RUN groupadd -g 1001 runner && useradd -r -u 1001 -g runner runner
 RUN apt-get update && apt-get install -y curl dos2unix
 
 COPY setup.sh /
-RUN dos2unix /setup.sh
+RUN dos2unix /setup.sh && chmod +x /setup.sh
 RUN /setup.sh
 
 COPY start.sh /
-RUN dos2unix /start.sh
+RUN dos2unix /start.sh && chmod +x /start.sh
 
 COPY user-setup.sh /
-RUN dos2unix /user-setup.sh
+RUN dos2unix /user-setup.sh && chmod +x /user-setup.h
 RUN /user-setup.sh
 
 USER runner
