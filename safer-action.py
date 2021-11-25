@@ -205,7 +205,7 @@ class Runner:
             print(f"Got work: {self.name}")
             self.working = True
         if self.running and self.quit_event.is_set():
-            print(f"Join: {self.name}")
+            print(f"Finished: {self.name}")
             self.thread.join()
             self.running = False
             self.working = False
@@ -296,7 +296,7 @@ if __name__ == "__main__":
         if num_idle == 0 and num_total < config["max-runners"]:
             container = start_runner()
             runner = Runner(container)
-            print(f"Hi! {runner}")
+            print(f"Adding new runner {runner.name}")
             runners.append(runner)
             continue
         
