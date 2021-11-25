@@ -1,4 +1,6 @@
-FROM debian:bullseye
+ARG ARG_ARCH_PREFIX=""
+
+FROM ${ARG_ARCH_PREFIX}debian:bullseye
 
 ARG ARG_OS="linux"
 ARG ARG_ARCH="x64"

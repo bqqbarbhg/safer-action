@@ -22,6 +22,7 @@ def load_config(path):
 
 def build_image(**kwargs):
     api = dc.api
+    print(kwargs)
     stream = api.build(**kwargs)
     if isinstance(stream, str):
         return dc.images.get(stream)
@@ -42,7 +43,7 @@ def build_image(**kwargs):
         return dc.images.get(image_id)
     raise docker.errors.BuildError(last_event or "Unknown", "")
 
-def build_runner(os_name, arch_name):
+def build_runner(os_name, os_arch):
     version = "2.284.0"
     checksums = {
         ("linux", "x64"):   "1ddfd7bbd3f2b8f5684a7d88d6ecb6de3cb2281a2a359543a018cc6e177067fc",
@@ -50,9 +51,23 @@ def build_runner(os_name, arch_name):
         ("linux", "arm64"): "a7a4e31d93d5852710dbacbb5f024be581c337c1be92ba2c729bb81e756bd49b",
     }
 
-    desc = f"{os_name}-{arch_name}-{version}"
+    prefixes = {
+        "x64": "amd64/",
+        "arm": "arm32v7/",
+        "arm64": "arm64v8/",
+    }
 
-    checksum = checksums.get((os_name, arch_name))
+    arch = config.get("arch", os_arch)
+    cross = arch != os_arch
+
+    if cross:
+        prefix = prefixes[arch]
+    else:
+        prefix = ""
+
+    desc = f"{os_name}-{os_arch}-{version}"
+
+    checksum = checksums.get((os_name, arch))
     if not checksum:
         raise RuntimeError(f"No known checksum for {desc}")
 
@@ -64,9 +79,10 @@ def build_runner(os_name, arch_name):
         nocache=argv.rebuild,
         buildargs={
             "ARG_OS": os_name,
-            "ARG_ARCH": arch_name,
+            "ARG_ARCH": arch,
             "ARG_VERSION": version,
             "ARG_CHECKSUM": checksum,
+            "ARG_ARCH_PREFIX": prefix,
         },
     )
 
@@ -97,11 +113,11 @@ def detect_os_arch():
         "armv8b": "arm64",
         "armv8l": "arm64",
     }
-    arch_name = machine_to_arch.get(platform.machine())
-    if not arch_name:
+    os_arch = machine_to_arch.get(platform.machine())
+    if not os_arch:
         raise RuntimeError(f"Unsupported architecture: {platform.machine()}")
     
-    return os_name, arch_name
+    return os_name, os_arch
 
 def start_runner():
     owner = config["repo"]["owner"]
@@ -234,8 +250,8 @@ if __name__ == "__main__":
         os.path.join(config_root, "runner-setup.sh"),
         os.path.join(self_path, "runner", "user-setup.sh"))
 
-    os_name, arch_name = detect_os_arch()
-    runner_image = build_runner(os_name, arch_name)
+    os_name, os_arch = detect_os_arch()
+    runner_image = build_runner(os_name, os_arch)
     proxy_image = build_proxy()
 
     # Find or create the network
