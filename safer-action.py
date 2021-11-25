@@ -22,7 +22,6 @@ def load_config(path):
 
 def build_image(**kwargs):
     api = dc.api
-    print(kwargs)
     stream = api.build(**kwargs)
     if isinstance(stream, str):
         return dc.images.get(stream)
