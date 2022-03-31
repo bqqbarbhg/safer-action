@@ -43,11 +43,11 @@ def build_image(**kwargs):
     raise docker.errors.BuildError(last_event or "Unknown", "")
 
 def build_runner(os_name, os_arch):
-    version = "2.284.0"
+    version = "2.289.2"
     checksums = {
-        ("linux", "x64"):   "1ddfd7bbd3f2b8f5684a7d88d6ecb6de3cb2281a2a359543a018cc6e177067fc",
-        ("linux", "arm"):   "2891eefcd2cd0cea33aef2261b628017d0879f69d66481c18350e2e50f3933f3",
-        ("linux", "arm64"): "a7a4e31d93d5852710dbacbb5f024be581c337c1be92ba2c729bb81e756bd49b",
+        ("linux", "x64"):   "7ba89bb75397896a76e98197633c087a9499d4c1db7603f21910e135b0d0a238",
+        ("linux", "arm"):   "e0b64b342f0c2825c595559d63cb29dc473eed648d194f052ed85e5a2ee7af56",
+        ("linux", "arm64"): "22581dada58a3e7ec2fd8eec98096790df4269615540fae4df3bbb7080de7f62",
     }
 
     prefixes = {
