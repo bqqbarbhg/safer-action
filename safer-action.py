@@ -126,6 +126,7 @@ def start_runner():
         "Accept": "application/vnd.github.v3+json",
     })
     token = r.json()["token"]
+    volumes = config.get("volumes", {})
 
     url = f"https://github.com/{owner}/{repo}"
     container = None
@@ -140,6 +141,7 @@ def start_runner():
                 detach=True,
                 name=f"{cluster}-{name}",
                 network=network.name,
+                volumes=volumes,
                 labels={ f"{cluster}.runner": "1" },
             )
             break
