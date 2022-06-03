@@ -1,6 +1,3 @@
-from re import I
-from tarfile import ExtractError
-from docker.models.networks import Network
 import requests
 from requests.auth import HTTPBasicAuth
 import os
@@ -42,13 +39,36 @@ def build_image(**kwargs):
         return dc.images.get(image_id)
     raise docker.errors.BuildError(last_event or "Unknown", "")
 
+def get_runner_version_and_checksums():
+    r = requests.get("https://api.github.com/repos/actions/runner/releases/latest",
+        headers={ "Accept": "application/vnd.github.v3+json" })
+    r.raise_for_status()
+    data = r.json()
+
+    version = data["tag_name"]
+    body = data["body"]
+
+    assert version.startswith("v")
+    version = version[1:]
+
+    checksums = { }
+
+    for m in re.finditer(r"<!-- BEGIN SHA ([a-z0-9_\-]+) -->([0-9a-f]+)<!-- END SHA ([a-z0-9_\-]+) -->", body):
+        pre = m.group(1)
+        sha = m.group(2)
+        post = m.group(3)
+        assert pre == post
+
+        os_arch, *flags = pre.split("_")
+        os_name, arch  = os_arch.split("-", maxsplit=1)
+        flags = frozenset(flags)
+        checksums[(os_name, arch, flags)] = sha
+    return version, checksums
+
 def build_runner(os_name, os_arch):
-    version = "2.291.1"
-    checksums = {
-        ("linux", "x64"):   "1bde3f2baf514adda5f8cf2ce531edd2f6be52ed84b9b6733bf43006d36dcd4c",
-        ("linux", "arm"):   "a78e86ba6428a28733730bdff3a807480f9eeb843f4c64bd1bbc45de13e61348",
-        ("linux", "arm64"): "c4823bd8322f80cb24a311ef49273f0677ff938530248242de7df33800a22900",
-    }
+    version, checksums = get_runner_version_and_checksums()
+    print(f"Found version: {version}")
+    print("\n".join(repr(c) for c in checksums.items()))
 
     prefixes = {
         "x64": "amd64/",
@@ -66,7 +86,8 @@ def build_runner(os_name, os_arch):
 
     desc = f"{os_name}-{os_arch}-{version}"
 
-    checksum = checksums.get((os_name, arch))
+    flags = frozenset()
+    checksum = checksums.get((os_name, arch, flags))
     if not checksum:
         raise RuntimeError(f"No known checksum for {desc}")
 
@@ -176,6 +197,8 @@ g_event = threading.Event()
 
 RE_BANNER = re.compile(r"^(([ .,'()|_\-\\/]*)|(\s*\|\s*Self-hosted runner registration\s*\|\s*))$")
 
+g_num_worker_failures = 0
+
 class Runner:
     def __init__(self, container):
         self.container = container
@@ -218,12 +241,15 @@ class Runner:
             g_event.set()
 
     def poll(self):
+        global g_num_worker_failures
         if self.running and not self.working and self.work_event.is_set():
             print(f"Got work: {self.name}")
             self.working = True
         if self.running and self.quit_event.is_set():
             print(f"Finished: {self.name}")
             self.thread.join()
+            if not self.working:
+                g_num_worker_failures += 1
             self.running = False
             self.working = False
 
@@ -316,9 +342,13 @@ if __name__ == "__main__":
             print(f"Adding new runner {runner.name}")
             runners.append(runner)
             continue
-        
+
         g_event.wait(timeout=config["poll-interval"]["main"])
         g_event.clear()
         for r in runners:
             r.poll()
         runners = [r for r in runners if r.running]
+
+        if g_num_worker_failures > 20:
+            print("Too many runner failures, exiting...")
+            exit(1)
