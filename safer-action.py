@@ -68,7 +68,6 @@ def get_runner_version_and_checksums():
 def build_runner(os_name, os_arch):
     version, checksums = get_runner_version_and_checksums()
     print(f"Found version: {version}")
-    print("\n".join(repr(c) for c in checksums.items()))
 
     prefixes = {
         "x64": "amd64/",
