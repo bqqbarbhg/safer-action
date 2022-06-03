@@ -14,4 +14,5 @@ echo "== Configuring =="
 ./config.sh --ephemeral --unattended --url ${URL} --token ${TOKEN} --work work --name ${NAME}
 
 echo "== Running =="
-./run.sh
+cp -f ./run-helper.sh.template ./run-helper.sh
+./run-helper.sh
