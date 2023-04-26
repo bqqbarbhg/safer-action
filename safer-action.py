@@ -145,7 +145,12 @@ def start_runner():
     r = requests.post(f"https://api.github.com/repos/{owner}/{repo}/actions/runners/registration-token", auth=auth, headers={
         "Accept": "application/vnd.github.v3+json",
     })
-    token = r.json()["token"]
+    r = r.json()
+    token = r.get("token")
+    if not token:
+        print(r)
+        raise RuntimeError("Failed to register runner")
+
     volumes = config.get("volumes", {})
 
     url = f"https://github.com/{owner}/{repo}"
