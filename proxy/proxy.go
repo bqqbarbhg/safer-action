@@ -92,9 +92,26 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			host = parts[0]
 		}
 
+		var found = false
+
 		status := "OK"
 		_, ok := h.hosts[host]
 		if ok {
+			found = true
+		}
+
+		// Try with wildcard
+		if !found {
+			ix := strings.Index(host, ".")
+			if ix >= 0 {
+				_, ok := h.hosts[host[ix:]]
+				if ok {
+					found = true
+				}
+			}
+		}
+
+		if found {
 			err := handleConnect(w, r)
 			if err != nil {
 				status = err.Error()
