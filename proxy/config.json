@@ -5,6 +5,8 @@
         "codeload.github.com",
         "pipelines.actions.githubusercontent.com",
         ".actions.githubusercontent.com",
-        "vstoken.actions.githubusercontent.com"
+        "vstoken.actions.githubusercontent.com",
+        "codecov.io",
+        "storage.googleapis.com"
     ]
 }
