@@ -156,12 +156,15 @@ def start_runner():
     url = f"https://github.com/{owner}/{repo}"
     container = None
     proxy_url = f"http://{cluster}-proxy:8080"
+
+    labels = ",".join(config.get("labels", []))
+
     for n in range(64):
         name = random.choice(config["runner-names"])
         try:
             container = dc.containers.run(
                 image=runner_image,
-                command=[url, token, f"{cluster}-{name}", proxy_url],
+                command=[url, token, f"{cluster}-{name}", proxy_url, labels],
                 auto_remove=True,
                 detach=True,
                 name=f"{cluster}-{name}",
