@@ -7,6 +7,8 @@
         ".actions.githubusercontent.com",
         "vstoken.actions.githubusercontent.com",
         "codecov.io",
-        "storage.googleapis.com"
+        "storage.googleapis.com",
+        "results-receiver.actions.githubusercontent.com",
+        ".blob.core.windows.net"
     ]
 }
