@@ -9,6 +9,8 @@
         "codecov.io",
         "storage.googleapis.com",
         "results-receiver.actions.githubusercontent.com",
-        ".blob.core.windows.net"
+        ".blob.core.windows.net",
+        ".githubapp.com",
+        "cli.codecov.io"
     ]
 }
