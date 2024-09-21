@@ -11,6 +11,6 @@
         "results-receiver.actions.githubusercontent.com",
         ".blob.core.windows.net",
         ".githubapp.com",
-        "cli.codecov.io"
+        ".codecov.io"
     ]
 }
