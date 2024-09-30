@@ -13,6 +13,11 @@ import random
 import re
 import time
 
+log_mutex = threading.Lock()
+def log(message):
+    with log_mutex:
+        print(message)
+
 def load_config(path):
     with open(path, "rb") as f:
         return json.load(f)
@@ -30,7 +35,7 @@ def build_image(**kwargs):
             raise docker.errors.BuildError(chunk["error"].strip(), "")
         if "stream" in chunk:
             line = chunk["stream"].strip()
-            print(line)
+            log(line)
             match = re.search(r"(^Successfully built |sha256:)([0-9a-f]+)$", line)
             if match:
                 image_id = match.group(2)
@@ -43,7 +48,7 @@ def retry_get(url, **kwargs):
     num_retries = 10
     for try_index in range(1 + num_retries):
         if try_index > 0:
-            print(f"Retrying GET {url} ..{try_index}/{num_retries}")
+            log(f"Retrying GET {url} ..{try_index}/{num_retries}")
         r = requests.get(url, **kwargs)
         if r.status_code in (429, 403):
             duration = 10.0 * 60.0
@@ -51,10 +56,10 @@ def retry_get(url, **kwargs):
                 ratelimit_reset = int(r.headers.get("x-ratelimit-reset"))
                 duration = ratelimit_reset - time.time() + 10.0
             except:
-                print("Failed to parse X-Ratelimit-Reset..")
+                log("Failed to parse X-Ratelimit-Reset..")
             duration = max(duration, 10.0)
             duration = min(duration, 60.0*60.0)
-            print(f"Waiting {duration/60.0:.1f}min for rate limit to recover..")
+            log(f"Waiting {duration/60.0:.1f}min for rate limit to recover..")
             time.sleep(duration)
             continue
 
@@ -88,7 +93,7 @@ def get_runner_version_and_checksums():
 
 def build_runner(os_name, os_arch):
     version, checksums = get_runner_version_and_checksums()
-    print(f"Found version: {version}")
+    log(f"Found version: {version}")
 
     prefixes = {
         "x64": "amd64/",
@@ -111,7 +116,7 @@ def build_runner(os_name, os_arch):
     if not checksum:
         raise RuntimeError(f"No known checksum for {desc}")
 
-    print(f"-- Building runner for {desc}")
+    log(f"-- Building runner for {desc}")
     path = os.path.join(self_path, "runner")
     return build_image(
         path=path,
@@ -127,7 +132,7 @@ def build_runner(os_name, os_arch):
     )
 
 def build_proxy():
-    print(f"-- Building proxy")
+    log(f"-- Building proxy")
     path = os.path.join(self_path, "proxy")
     return build_image(
         path=path,
@@ -169,7 +174,7 @@ def start_runner():
     r = r.json()
     token = r.get("token")
     if not token:
-        print(r)
+        log(repr(r))
         raise RuntimeError("Failed to register runner")
 
     volumes = config.get("volumes", {})
@@ -195,7 +200,7 @@ def start_runner():
             )
             break
         except Exception as e:
-            print(str(e))
+            log(repr(e))
     return container
 
 def remove_stale_runners(our_runners):
@@ -216,7 +221,7 @@ def remove_stale_runners(our_runners):
             continue
         if status == "offline" and name.startswith(prefix):
             id = runner["id"]
-            print(f"Removing stale runner {name} ({id})")
+            log(f"Removing stale runner {name} ({id})")
             r = requests.delete(f"https://api.github.com/repos/{owner}/{repo}/actions/runners/{id}", auth=auth, headers={
                 "Accept": "application/vnd.github.v3+json",
             })
@@ -242,7 +247,7 @@ class Runner:
             self.running = False
 
     def listen_on_thread(self):
-        print(f"Listen: {self.name}")
+        log(f"Listen: {self.name}")
         try:
             logs = self.container.logs(stream=True)
             name = self.name[len(cluster) + 1:]
@@ -259,22 +264,22 @@ class Runner:
                     if lineno < 32 and RE_BANNER.match(line):
                         hide = True
                     if line.strip() and not hide:
-                        print(f"{name}| {line}")
+                        log(f"{name}| {line}")
                     lineno += 1
             self.quit_event.set()
             g_event.set()
         except Exception as e:
-            print(e)
+            log(repr(e))
             self.quit_event.set()
             g_event.set()
 
     def poll(self):
         global g_num_worker_failures
         if self.running and not self.working and self.work_event.is_set():
-            print(f"Got work: {self.name}")
+            log(f"Got work: {self.name}")
             self.working = True
         if self.running and self.quit_event.is_set():
-            print(f"Finished: {self.name}")
+            log(f"Finished: {self.name}")
             self.thread.join()
             if not self.working:
                 g_num_worker_failures += 1
@@ -314,7 +319,7 @@ if __name__ == "__main__":
     try:
         network = dc.networks.get(network_name)
     except docker.errors.NotFound:
-        print(f"-- Creating network {network_name}")
+        log(f"-- Creating network {network_name}")
         network = dc.networks.create(
             name=network_name,
             internal=True
@@ -328,12 +333,12 @@ if __name__ == "__main__":
             proxy.remove(force=True)
             proxy = None
         elif proxy.status != "running":
-            print(f"-- Restarting proxy {proxy_name}")
+            log(f"-- Restarting proxy {proxy_name}")
             proxy.restart()
     except docker.errors.NotFound:
         proxy = None
     if not proxy:
-        print(f"-- Creating proxy {proxy_name}")
+        log(f"-- Creating proxy {proxy_name}")
         proxy = dc.containers.create(
             image=proxy_image,
             name=proxy_name,
@@ -352,7 +357,7 @@ if __name__ == "__main__":
 
     runners = [Runner(c) for c in containers]
     for runner in runners:
-        print(f"Found: {runner}")
+        log(f"Found: {runner}")
     
     last_remove_time = 0
 
@@ -367,7 +372,7 @@ if __name__ == "__main__":
         if num_idle == 0 and num_total < config["max-runners"]:
             container = start_runner()
             runner = Runner(container)
-            print(f"Adding new runner {runner.name}")
+            log(f"Adding new runner {runner.name}")
             runners.append(runner)
             continue
 
@@ -378,5 +383,5 @@ if __name__ == "__main__":
         runners = [r for r in runners if r.running]
 
         if g_num_worker_failures > 20:
-            print("Too many runner failures, exiting...")
+            log("Too many runner failures, exiting...")
             exit(1)
