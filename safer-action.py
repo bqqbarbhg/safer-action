@@ -39,8 +39,28 @@ def build_image(**kwargs):
         return dc.images.get(image_id)
     raise docker.errors.BuildError(last_event or "Unknown", "")
 
+def retry_get(url, **kwargs):
+    num_retries = 10
+    for try_index in range(1 + num_retries):
+        if try_index > 0:
+            print(f"Retrying GET {url} ..{try_index}/{num_retries}")
+        r = requests.get(url, **kwargs)
+        if r.status_code in (429, 403):
+            duration = 10.0 * 60.0
+            try:
+                ratelimit_reset = int(r.get("x-ratelimit-reset"))
+                duration = ratelimit_reset - time.time() + 10.0
+            except:
+                print("Failed to parse X-Ratelimit-Reset..")
+            duration = max(duration, 10.0)
+            duration = min(duration, 60.0*60.0)
+            print(f"Waiting for {duration/60.0:.1}min for rate limit to recover..")
+            time.sleep(duration)
+
+        return r
+
 def get_runner_version_and_checksums():
-    r = requests.get("https://api.github.com/repos/actions/runner/releases/latest",
+    r = retry_get("https://api.github.com/repos/actions/runner/releases/latest",
         headers={ "Accept": "application/vnd.github.v3+json" })
     r.raise_for_status()
     data = r.json()
