@@ -56,6 +56,7 @@ def retry_get(url, **kwargs):
             duration = min(duration, 60.0*60.0)
             print(f"Waiting {duration/60.0:.1f}min for rate limit to recover..")
             time.sleep(duration)
+            continue
 
         return r
 
