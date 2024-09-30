@@ -54,7 +54,7 @@ def retry_get(url, **kwargs):
                 print("Failed to parse X-Ratelimit-Reset..")
             duration = max(duration, 10.0)
             duration = min(duration, 60.0*60.0)
-            print(f"Waiting for {duration/60.0:.1f}min for rate limit to recover..")
+            print(f"Waiting {duration/60.0:.1f}min for rate limit to recover..")
             time.sleep(duration)
 
         return r
