@@ -48,13 +48,13 @@ def retry_get(url, **kwargs):
         if r.status_code in (429, 403):
             duration = 10.0 * 60.0
             try:
-                ratelimit_reset = int(r.get("x-ratelimit-reset"))
+                ratelimit_reset = int(r.headers.get("x-ratelimit-reset"))
                 duration = ratelimit_reset - time.time() + 10.0
             except:
                 print("Failed to parse X-Ratelimit-Reset..")
             duration = max(duration, 10.0)
             duration = min(duration, 60.0*60.0)
-            print(f"Waiting for {duration/60.0:.1}min for rate limit to recover..")
+            print(f"Waiting for {duration/60.0:.1f}min for rate limit to recover..")
             time.sleep(duration)
 
         return r
