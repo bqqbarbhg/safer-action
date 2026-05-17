@@ -11,6 +11,7 @@
         "results-receiver.actions.githubusercontent.com",
         ".blob.core.windows.net",
         ".githubapp.com",
-        ".codecov.io"
+        ".codecov.io",
+        ".ingest.us.sentry.io"
     ]
 }
