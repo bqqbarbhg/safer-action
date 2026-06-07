@@ -12,6 +12,58 @@ import shutil
 import random
 import re
 import time
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
+
+@dataclass
+class Config:
+    cluster_name: str
+    auth_username: str
+    auth_access_token: str
+    kind: str
+    url: str
+    api_url: str
+    arch: Optional[str]
+    labels: List[str]
+    volumes: Dict[str, Any]
+    runner_names: List[str]
+    max_runners: int
+    poll_interval: Dict[str, float]
+
+def parse_config(raw_config) -> Config:
+    has_org = "org" in raw_config
+    has_repo = "repo" in raw_config
+    if has_org == has_repo:
+        raise RuntimeError("Configure exactly one runner scope: 'repo' or 'org'")
+
+    if has_org:
+        org = raw_config["org"]
+        if isinstance(org, dict):
+            org = org["name"]
+        kind = "org"
+        api_url = f"https://api.github.com/orgs/{org}/actions/runners"
+        url = f"https://github.com/{org}"
+    else:
+        owner = raw_config["repo"]["owner"]
+        repo = raw_config["repo"]["name"]
+        kind = "repo"
+        api_url = f"https://api.github.com/repos/{owner}/{repo}/actions/runners"
+        url = f"https://github.com/{owner}/{repo}"
+
+    return Config(
+        cluster_name=raw_config["cluster-name"],
+        auth_username=raw_config["auth"]["username"],
+        auth_access_token=raw_config["auth"]["access-token"],
+        kind=kind,
+        url=url,
+        api_url=api_url,
+        arch=raw_config.get("arch"),
+        labels=raw_config.get("labels", []),
+        volumes=raw_config.get("volumes", {}),
+        runner_names=raw_config["runner-names"],
+        max_runners=raw_config["max-runners"],
+        poll_interval=raw_config["poll-interval"],
+    )
 
 log_mutex = threading.Lock()
 def log(message):
@@ -20,7 +72,8 @@ def log(message):
 
 def load_config(path):
     with open(path, "rb") as f:
-        return json.load(f)
+        raw_config = json.load(f)
+    return parse_config(raw_config)
 
 def build_image(**kwargs):
     api = dc.api
@@ -101,7 +154,7 @@ def build_runner(os_name, os_arch):
         "arm64": "arm64v8/",
     }
 
-    arch = config.get("arch", os_arch)
+    arch = config.arch or os_arch
     cross = arch != os_arch
 
     if cross:
@@ -165,10 +218,8 @@ def detect_os_arch():
     return os_name, os_arch
 
 def start_runner():
-    owner = config["repo"]["owner"]
-    repo = config["repo"]["name"]
-    auth = HTTPBasicAuth(config["auth"]["username"], config["auth"]["access-token"])
-    r = requests.post(f"https://api.github.com/repos/{owner}/{repo}/actions/runners/registration-token", auth=auth, headers={
+    auth = HTTPBasicAuth(config.auth_username, config.auth_access_token)
+    r = requests.post(f"{config.api_url}/registration-token", auth=auth, headers={
         "Accept": "application/vnd.github.v3+json",
     })
     r = r.json()
@@ -177,20 +228,19 @@ def start_runner():
         log(repr(r))
         raise RuntimeError("Failed to register runner")
 
-    volumes = config.get("volumes", {})
+    volumes = config.volumes
 
-    url = f"https://github.com/{owner}/{repo}"
     container = None
     proxy_url = f"http://{cluster}-proxy:8080"
 
-    labels = ",".join(config.get("labels", []))
+    labels = ",".join(config.labels)
 
     for n in range(64):
-        name = random.choice(config["runner-names"])
+        name = random.choice(config.runner_names)
         try:
             container = dc.containers.run(
                 image=runner_image,
-                command=[url, token, f"{cluster}-{name}", proxy_url, labels],
+                command=[config.url, token, f"{cluster}-{name}", proxy_url, labels],
                 auto_remove=True,
                 detach=True,
                 name=f"{cluster}-{name}",
@@ -206,10 +256,8 @@ def start_runner():
 def remove_stale_runners(our_runners):
     names = set(r.name for r in our_runners)
 
-    owner = config["repo"]["owner"]
-    repo = config["repo"]["name"]
-    auth = HTTPBasicAuth(config["auth"]["username"], config["auth"]["access-token"])
-    r = requests.get(f"https://api.github.com/repos/{owner}/{repo}/actions/runners", auth=auth, headers={
+    auth = HTTPBasicAuth(config.auth_username, config.auth_access_token)
+    r = requests.get(config.api_url, auth=auth, headers={
         "Accept": "application/vnd.github.v3+json",
     })
     runners = r.json()
@@ -222,7 +270,7 @@ def remove_stale_runners(our_runners):
         if status == "offline" and name.startswith(prefix):
             id = runner["id"]
             log(f"Removing stale runner {name} ({id})")
-            r = requests.delete(f"https://api.github.com/repos/{owner}/{repo}/actions/runners/{id}", auth=auth, headers={
+            r = requests.delete(f"{config.api_url}/{id}", auth=auth, headers={
                 "Accept": "application/vnd.github.v3+json",
             })
 
@@ -304,7 +352,7 @@ if __name__ == "__main__":
     config_root = argv.config if argv.config else os.path.join(self_path, "config")
     config_path = os.path.join(config_root, "config.json")
     config = load_config(config_path)
-    cluster = config["cluster-name"]
+    cluster = config.cluster_name
 
     shutil.copy2(
         os.path.join(config_root, "runner-setup.sh"),
@@ -363,20 +411,20 @@ if __name__ == "__main__":
 
     while True:
         now = time.time()
-        if now - last_remove_time >= config["poll-interval"]["stale-runners"]:
+        if now - last_remove_time >= config.poll_interval["stale-runners"]:
             remove_stale_runners(runners)
             last_remove_time = now
 
         num_idle = sum(1 for r in runners if not r.working)
         num_total = len(runners)
-        if num_idle == 0 and num_total < config["max-runners"]:
+        if num_idle == 0 and num_total < config.max_runners:
             container = start_runner()
             runner = Runner(container)
             log(f"Adding new runner {runner.name}")
             runners.append(runner)
             continue
 
-        g_event.wait(timeout=config["poll-interval"]["main"])
+        g_event.wait(timeout=config.poll_interval["main"])
         g_event.clear()
         for r in runners:
             r.poll()
