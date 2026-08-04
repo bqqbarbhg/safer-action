@@ -21,7 +21,8 @@ RUN dos2unix /start.sh && chmod +x /start.sh
 COPY user-setup.sh /
 RUN dos2unix /user-setup.sh && chmod +x /user-setup.sh
 RUN /user-setup.sh
-RUN /home/runner/bin/Runner.Listener --version
 
 USER runner
+RUN /home/runner/bin/Runner.Listener --version
+
 ENTRYPOINT ["bash", "/start.sh"]
