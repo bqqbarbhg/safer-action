@@ -153,6 +153,11 @@ def build_runner(os_name, os_arch):
         "arm": "arm32v7/",
         "arm64": "arm64v8/",
     }
+    platforms = {
+        "x64": "linux/amd64",
+        "arm": "linux/arm/v7",
+        "arm64": "linux/arm64/v8",
+    }
 
     arch = config.arch or os_arch
     cross = arch != os_arch
@@ -162,7 +167,7 @@ def build_runner(os_name, os_arch):
     else:
         prefix = ""
 
-    desc = f"{os_name}-{os_arch}-{version}"
+    desc = f"{os_name}-{arch}-{version}"
 
     flags = frozenset()
     checksum = checksums.get((os_name, arch, flags))
@@ -175,6 +180,7 @@ def build_runner(os_name, os_arch):
         path=path,
         tag=f"{cluster}-runner",
         nocache=argv.rebuild,
+        platform=platforms[arch],
         buildargs={
             "ARG_OS": os_name,
             "ARG_ARCH": arch,
