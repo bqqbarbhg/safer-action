@@ -1,6 +1,6 @@
 ARG ARG_ARCH_PREFIX=""
 
-FROM ${ARG_ARCH_PREFIX}debian:bookworm
+FROM ${ARG_ARCH_PREFIX}debian:trixie
 
 ARG ARG_OS="linux"
 ARG ARG_ARCH="x64"
@@ -9,7 +9,7 @@ ARG ARG_CHECKSUM="1ddfd7bbd3f2b8f5684a7d88d6ecb6de3cb2281a2a359543a018cc6e177067
 
 RUN groupadd -g 1001 runner && useradd -r -u 1001 -g runner runner
 
-RUN apt-get update && apt-get install -y curl dos2unix libicu72
+RUN apt-get update && apt-get install -y curl dos2unix libicu76
 
 COPY setup.sh /
 RUN dos2unix /setup.sh && chmod +x /setup.sh
